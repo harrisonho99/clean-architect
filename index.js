@@ -1,5 +1,5 @@
 const { app } = require('./app');
-const { init } = require('./tools');
+const { init, sleep } = require('./tools');
 
 /**
  *entry
@@ -7,6 +7,7 @@ const { init } = require('./tools');
  */
 
 async function main() {
+  await sleep(2000);
   init();
   app().catch((err) => {
     console.error(err);
