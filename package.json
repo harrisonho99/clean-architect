@@ -1,0 +1,17 @@
+{
+  "name": "clean-arch",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "dev": "nodemon index.js"
+  },
+  "author": "Harrison",
+  "license": "ISC",
+  "dependencies": {
+    "mongodb": "^4.1.3",
+    "node-fetch": "^3.0.0",
+    "nodemon": "^2.0.14"
+  },
+  "type": "commonjs"
+}
