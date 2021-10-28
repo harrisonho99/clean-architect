@@ -2,6 +2,7 @@ const { MongoClient } = require('mongodb');
 const URI = 'mongodb+srv://root:142536@cluster0.7q8km.mongodb.net/myDB?retryWrites=true&w=majority';
 const SAMPLE_AIRBNB = 'sample_airbnb';
 const LISTING_REVIEWS = 'listingAndReviews';
+const USER = 'users';
 
 /**
  * Application Index
@@ -57,9 +58,24 @@ async function app() {
     //   minimumNumberObBathrooms: 6,
     //   minimumNumberObBedrooms: 20,
     // });
-    await upsertListingByName(mongodbClient, 'hoang ho 1', {
-      livingRooms: 10,
-    });
+    // await upsertListingByName(mongodbClient, 'hoang ho 1', {
+    //   livingRooms: 10,
+    // });
+    // console.log(
+    //   creatReservationDocument('Infinite Views', [new Date('2021-12-31'), new Date('2021-01-01')], {
+    //     pricePerNight: 180,
+    //     sepecialRequest: 'Late checkout',
+    //     breakfastIncluded: true,
+    //   })
+    // );
+
+    await createReservation(
+      mongodbClient,
+      'leslie@example.com',
+      'Infinite Views',
+      [new Date('2021-12-31'), new Date('2022-01-01')],
+      { pricePerNight: 180, specialRequests: 'Late Checkout ', breakfastIncluded: true }
+    );
   } catch (error) {
     console.error(error);
   } finally {
@@ -83,7 +99,7 @@ async function listDatabases(client) {
 /**
  *
  * @param {MongoClient} client
- * @param {Document} newListing
+ * @param {any} newListing
  */
 async function createListing(client, newListing) {
   const result = await client.db(SAMPLE_AIRBNB).collection(LISTING_REVIEWS).insertOne(newListing);
@@ -93,7 +109,7 @@ async function createListing(client, newListing) {
 /**
  *
  * @param {MongoClient} client
- * @param {Document []} newListing
+ * @param {any []} newListing
  */
 async function createMultipleListing(client, newListing) {
   const result = await client.db(SAMPLE_AIRBNB).collection(LISTING_REVIEWS).insertMany(newListing);
@@ -143,7 +159,7 @@ async function findAllListing(client) {
  *
  * @param {MongoClient} client
  * @param {string} nameOfListing
- * @param {Document} updatedListing
+ * @param {any} updatedListing
  */
 async function updateListingByName(client, nameOfListing, updatedListing) {
   const result = await client
@@ -157,7 +173,7 @@ async function updateListingByName(client, nameOfListing, updatedListing) {
  *
  * @param {MongoClient} client
  * @param {string} nameOfListing
- * @param {Document} updatedListing
+ * @param {any} updatedListing
  */
 async function upsertListingByName(client, nameOfListing, updatedListing) {
   const result = await client
@@ -174,5 +190,116 @@ async function upsertListingByName(client, nameOfListing, updatedListing) {
     ]);
   console.log(result);
 }
+/**
+ *
+ * @param {MongoClient} client
+ * @param {any} newUsers
+ */
+async function createMultipleUsers(client, newUsers) {
+  const result = await client.db(SAMPLE_AIRBNB).collection(USER).insertMany(newUsers);
 
+  console.log(`${result.insertedCount} new user(s) created with the following id(s):`);
+  console.log(result.insertedIds);
+}
+
+/**
+ *
+ * Helper function transform data
+ * @param {string} nameOfListing
+ * @param {Date []} reservationDates
+ * @param {any} reservationDetails
+ *
+ */
+function creatReservationDocument(nameOfListing, reservationDates, reservationDetails) {
+  let reservation = { name: nameOfListing, date: reservationDates };
+
+  for (let detail in reservationDetails) {
+    reservation[detail] = reservationDetails[detail];
+  }
+  return reservation;
+}
+/**
+ *
+ * @param {MongoClient} client
+ * @param {string} userEmail
+ * @param {string} nameOfListing
+ * @param {Date []} reservationDates
+ * @param {any} reservationDetails
+ */
+async function createReservation(
+  client,
+  userEmail,
+  nameOfListing,
+  reservationDates,
+  reservationDetails
+) {
+  const userColletion = client.db(SAMPLE_AIRBNB).collection(USER);
+  const listingsAndReviewsCollection = client.db(SAMPLE_AIRBNB).collection(LISTING_REVIEWS);
+  const reservation = creatReservationDocument(nameOfListing, reservationDates, reservationDetails);
+
+  //transaction
+  const session = client.startSession();
+  const transactionOptions = {
+    readPreference: 'primary',
+    readConcern: { level: 'local' },
+    writeConcern: { w: 'majority' },
+  };
+  try {
+     const transactionResults = await session.withTransaction(async () => {
+       // Important:: You must pass the session to each of the operations
+
+       // Add a reservation to the reservations array for the appropriate document in the users collection
+       const usersUpdateResults = await userColletion.updateOne(
+         { email: userEmail },
+         { $addToSet: { reservations: reservation } },
+         { session }
+       );
+       console.log(
+         `${usersUpdateResults.matchedCount} document(s) found in the users collection with the email address ${userEmail}.`
+       );
+       console.log(
+         `${usersUpdateResults.modifiedCount} document(s) was/were updated to include the reservation.`
+       );
+
+       // Check if the Airbnb listing is already reserved for those dates. If so, abort the transaction.
+       const isListingReservedResults = await listingsAndReviewsCollection.findOne(
+         { name: nameOfListing, datesReserved: { $in: reservationDates } },
+         { session }
+       );
+       if (isListingReservedResults) {
+         await session.abortTransaction();
+         console.error(
+           'This listing is already reserved for at least one of the given dates. The reservation could not be created.'
+         );
+         console.error(
+           'Any operations that already occurred as part of this transaction will be rolled back.'
+         );
+         return;
+       }
+
+       //  Add the reservation dates to the datesReserved array for the appropriate document in the listingsAndRewiews collection
+       const listingsAndReviewsUpdateResults = await listingsAndReviewsCollection.updateOne(
+         { name: nameOfListing },
+         { $addToSet: { datesReserved: { $each: reservationDates } } },
+         { session }
+       );
+       console.log(
+         `${listingsAndReviewsUpdateResults.matchedCount} document(s) found in the listingsAndReviews collection with the name ${nameOfListing}.`
+       );
+       console.log(
+         `${listingsAndReviewsUpdateResults.modifiedCount} document(s) was/were updated to include the reservation dates.`
+       );
+     // @ts-ignore
+     }, transactionOptions);
+    if (transactionResults != undefined) {
+      console.log('The reservation was succesfully created');
+    } else {
+      console.log('The reservation was intentionally aborted');
+    }
+  } catch (err) {
+    console.log('The transaction was aborted due to an unpected error : ', err);
+  } finally {
+    await session.endSession();
+  }
+}
 module.exports = { app };

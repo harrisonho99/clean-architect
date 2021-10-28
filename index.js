@@ -3,7 +3,7 @@ const { init, sleep } = require('./tools');
 
 /**
  *entry
- * @returns {void}
+ * @returns {Promise<void>}
  */
 
 async function main() {
