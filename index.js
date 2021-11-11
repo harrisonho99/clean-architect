@@ -1,14 +1,15 @@
 const { app } = require('./app');
-const { init, sleep } = require('./tools');
+const { init } = require('./init');
+const { sleep } = require('./tools/major');
 
 /**
  *entry
  * @returns {Promise<void>}
  */
-
 async function main() {
-  await sleep(2000);
-  init();
+  await sleep(1000);
+  await init();
+
   app().catch((err) => {
     console.error(err);
   });

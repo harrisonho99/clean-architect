@@ -1,5 +1,4 @@
 const { MongoClient } = require('mongodb');
-const URI = 'mongodb+srv://root:142536@cluster0.7q8km.mongodb.net/myDB?retryWrites=true&w=majority';
 const SAMPLE_AIRBNB = 'sample_airbnb';
 const LISTING_REVIEWS = 'listingAndReviews';
 const USER = 'users';
