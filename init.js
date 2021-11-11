@@ -22,6 +22,7 @@ async function init() {
   console.log('Initialized done!');
   return { dbClient };
 }
+
 module.exports = {
   init,
 };
