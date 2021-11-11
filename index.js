@@ -8,11 +8,12 @@ const { sleep } = require('./tools/major');
  */
 async function main() {
   await sleep(1000);
-  await init();
-
-  app().catch((err) => {
-    console.error(err);
-  });
+  const { dbClient } = await init();
+  await app(dbClient);
 }
 
-main();
+
+
+main().catch((err) => {
+  console.error(err);
+});

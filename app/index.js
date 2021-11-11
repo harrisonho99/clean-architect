@@ -4,14 +4,13 @@ const LISTING_REVIEWS = 'listingAndReviews';
 const USER = 'users';
 
 /**
+ *
  * Application Index
+ * @param {MongoClient} dbClient
  * @returns {Promise<void>}
  */
-async function app() {
-  const mongodbClient = new MongoClient(URI);
-
+async function app(dbClient) {
   try {
-    await mongodbClient.connect();
     // await listDatabases(mongodbClient);
     // await createListing(mongodbClient, {
     //   name: 'hoang ho',
@@ -69,7 +68,7 @@ async function app() {
     // );
 
     await createReservation(
-      mongodbClient,
+      dbClient,
       'leslie@example.com',
       'Infinite Views',
       [new Date('2021-12-31'), new Date('2022-01-01')],
@@ -77,8 +76,6 @@ async function app() {
     );
   } catch (error) {
     console.error(error);
-  } finally {
-    await mongodbClient.close();
   }
 }
 
@@ -244,52 +241,52 @@ async function createReservation(
     writeConcern: { w: 'majority' },
   };
   try {
-     const transactionResults = await session.withTransaction(async () => {
-       // Important:: You must pass the session to each of the operations
+    const transactionResults = await session.withTransaction(async () => {
+      // Important:: You must pass the session to each of the operations
 
-       // Add a reservation to the reservations array for the appropriate document in the users collection
-       const usersUpdateResults = await userColletion.updateOne(
-         { email: userEmail },
-         { $addToSet: { reservations: reservation } },
-         { session }
-       );
-       console.log(
-         `${usersUpdateResults.matchedCount} document(s) found in the users collection with the email address ${userEmail}.`
-       );
-       console.log(
-         `${usersUpdateResults.modifiedCount} document(s) was/were updated to include the reservation.`
-       );
+      // Add a reservation to the reservations array for the appropriate document in the users collection
+      const usersUpdateResults = await userColletion.updateOne(
+        { email: userEmail },
+        { $addToSet: { reservations: reservation } },
+        { session }
+      );
+      console.log(
+        `${usersUpdateResults.matchedCount} document(s) found in the users collection with the email address ${userEmail}.`
+      );
+      console.log(
+        `${usersUpdateResults.modifiedCount} document(s) was/were updated to include the reservation.`
+      );
 
-       // Check if the Airbnb listing is already reserved for those dates. If so, abort the transaction.
-       const isListingReservedResults = await listingsAndReviewsCollection.findOne(
-         { name: nameOfListing, datesReserved: { $in: reservationDates } },
-         { session }
-       );
-       if (isListingReservedResults) {
-         await session.abortTransaction();
-         console.error(
-           'This listing is already reserved for at least one of the given dates. The reservation could not be created.'
-         );
-         console.error(
-           'Any operations that already occurred as part of this transaction will be rolled back.'
-         );
-         return;
-       }
+      // Check if the Airbnb listing is already reserved for those dates. If so, abort the transaction.
+      const isListingReservedResults = await listingsAndReviewsCollection.findOne(
+        { name: nameOfListing, datesReserved: { $in: reservationDates } },
+        { session }
+      );
+      if (isListingReservedResults) {
+        await session.abortTransaction();
+        console.error(
+          'This listing is already reserved for at least one of the given dates. The reservation could not be created.'
+        );
+        console.error(
+          'Any operations that already occurred as part of this transaction will be rolled back.'
+        );
+        return;
+      }
 
-       //  Add the reservation dates to the datesReserved array for the appropriate document in the listingsAndRewiews collection
-       const listingsAndReviewsUpdateResults = await listingsAndReviewsCollection.updateOne(
-         { name: nameOfListing },
-         { $addToSet: { datesReserved: { $each: reservationDates } } },
-         { session }
-       );
-       console.log(
-         `${listingsAndReviewsUpdateResults.matchedCount} document(s) found in the listingsAndReviews collection with the name ${nameOfListing}.`
-       );
-       console.log(
-         `${listingsAndReviewsUpdateResults.modifiedCount} document(s) was/were updated to include the reservation dates.`
-       );
-     // @ts-ignore
-     }, transactionOptions);
+      //  Add the reservation dates to the datesReserved array for the appropriate document in the listingsAndRewiews collection
+      const listingsAndReviewsUpdateResults = await listingsAndReviewsCollection.updateOne(
+        { name: nameOfListing },
+        { $addToSet: { datesReserved: { $each: reservationDates } } },
+        { session }
+      );
+      console.log(
+        `${listingsAndReviewsUpdateResults.matchedCount} document(s) found in the listingsAndReviews collection with the name ${nameOfListing}.`
+      );
+      console.log(
+        `${listingsAndReviewsUpdateResults.modifiedCount} document(s) was/were updated to include the reservation dates.`
+      );
+      // @ts-ignore
+    }, transactionOptions);
     if (transactionResults != undefined) {
       console.log('The reservation was succesfully created');
     } else {

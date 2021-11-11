@@ -7,7 +7,7 @@ const { MongoDBDriver } = require('./mongodb');
  */
 const CONFIG = {
   database: MongoDBDriver,
-  threadNum: os.cpus.length,
+  threadNum: os.cpus().length,
 };
 
 module.exports = CONFIG;
